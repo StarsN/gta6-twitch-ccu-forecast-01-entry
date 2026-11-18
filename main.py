@@ -202,11 +202,17 @@ def model_forecast(case, first_viewers, first_channels):
     raw = {}
     for row in case["forecast"]:
         h = row["hour"]
-        predict, loo = fit_hour(pool, h, LAM)
-        centre = predict(target)
-        qs = [interp_quantile(loo, t) for t in LEVELS]
-        med = qs[2]
-        raw[h] = [centre + med + (q - med) * SPREAD for q in qs]
+        try:
+            predict, loo = fit_hour(pool, h, LAM)
+            centre = predict(target)
+            qs = [interp_quantile(loo, t) for t in LEVELS]
+            med = qs[2]
+            raw[h] = [centre + med + (q - med) * SPREAD for q in qs]
+        except Exception:
+            # One hour's fit failing must not sink the whole case: fall back
+            # to the persistence shape for this hour only.
+            raw[h] = [math.log(max(1.0, float(first_viewers)))
+                      + z * 0.15 * math.sqrt(h - 1) for z in Z]
     if SMOOTH > 0:
         meds = {h: raw[h][2] for h in raw}
         for h in raw:
